@@ -1,0 +1,4 @@
+django
+sqlglot
+pytest
+pytest-django
