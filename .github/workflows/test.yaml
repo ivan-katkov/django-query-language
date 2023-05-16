@@ -33,5 +33,5 @@ jobs:
       - name: Test with pytest
         run: |
           pwd
-          ll -lah
+          ls -lah
           DJANGO_SETTINGS_MODULE=tests.settings pytest
