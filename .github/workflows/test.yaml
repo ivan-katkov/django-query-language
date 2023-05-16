@@ -34,5 +34,6 @@ jobs:
         run: |
           pwd
           ls -lah
+          ls -lah ../
           ls -lah tests/
           pytest
