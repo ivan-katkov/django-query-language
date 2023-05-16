@@ -4,13 +4,12 @@ on: [push]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
-#     env:
-#       DJANGO_SETTINGS_MODULE: "tests.settings"
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    #     env:
+    #       DJANGO_SETTINGS_MODULE: "tests.settings"
 
     steps:
       - uses: actions/checkout@v3
@@ -23,12 +22,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install ruff pytest pytest-django
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-#       - name: Lint with ruff
-#         run: |
-#           # stop the build if there are Python syntax errors or undefined names
-#           ruff --format=github --select=E9,F63,F7,F82 --target-version=py37 .
-#           # default set of ruff rules with GitHub Annotations
-#           ruff --format=github --target-version=py37 .
+      #       - name: Lint with ruff
+      #         run: |
+      #           # stop the build if there are Python syntax errors or undefined names
+      #           ruff --format=github --select=E9,F63,F7,F82 --target-version=py37 .
+      #           # default set of ruff rules with GitHub Annotations
+      #           ruff --format=github --target-version=py37 .
       - name: Test with pytest
         run: |
           python runtests.py
