@@ -1,3 +1,7 @@
-# django-query-language
+# django-query-language 
 
-![Test django-query-language](https://github.com/github/docs/actions/workflows/main.yml/badge.svg)
+![tests](https://github.com/ivan-katkov/django-query-language/actions/workflows/test.yaml/badge.svg)
+
+
+A package for parsing parametric queries to Django filter expression
+
