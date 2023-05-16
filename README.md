@@ -1,3 +1,3 @@
 # django-query-language
 
-[![Test django-query-language](https://github.com/ivan-katkov/django-query-language/actions/workflows/tests.yaml/badge.svg)](https://github.com/ivan-katkov/django-query-language/actions/workflows/tests.yaml)
+![Test django-query-language](https://github.com/github/docs/actions/workflows/main.yml/badge.svg)
