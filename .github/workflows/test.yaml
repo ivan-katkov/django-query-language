@@ -36,4 +36,4 @@ jobs:
           ls -lah
           ls -lah ../
           ls -lah tests/
-          pytest
+          python runtests.py
