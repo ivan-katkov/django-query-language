@@ -8,10 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-#         python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
-          python-version: ["3.11"]
-    env:
-      DJANGO_SETTINGS_MODULE: "tests.settings"
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+#     env:
+#       DJANGO_SETTINGS_MODULE: "tests.settings"
 
     steps:
       - uses: actions/checkout@v3
@@ -32,8 +31,4 @@ jobs:
 #           ruff --format=github --target-version=py37 .
       - name: Test with pytest
         run: |
-          pwd
-          ls -lah
-          ls -lah ../
-          ls -lah tests/
           python runtests.py
