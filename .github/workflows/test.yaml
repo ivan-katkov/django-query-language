@@ -1,4 +1,4 @@
-name: querylanguage
+name: Tests
 
 on: [push]
 
