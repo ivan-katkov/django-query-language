@@ -21,6 +21,8 @@ class MainModel(models.Model):
     f1 = models.IntegerField(null=True)
     f2 = models.FloatField(null=True)
     f3 = models.FloatField(null=True)
+    ra = models.FloatField(null=True)
+    dec = models.FloatField(null=True)
 
     related = models.ForeignKey(RelatedModel, on_delete=models.CASCADE)
 

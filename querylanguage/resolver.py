@@ -50,7 +50,12 @@ class Parser:
                 return self._resolve_column(p)
 
         elif isinstance(p, exp.Neg):
-            return -self._resolve(p.this)
+            if isinstance(p.this, exp.Literal) & (not p.this.is_string):
+                # this is simplest way of somewhat number
+                return Value(-self._resolve(p.this).value)
+            else:
+                # this can be more complicated expression
+                return -self._resolve(p.this)
 
         elif isinstance(p, exp.Not):
             return ~Q(self._resolve(p.this))
@@ -115,6 +120,12 @@ class Parser:
         elif isinstance(p, exp.In):
             return In(self._resolve(p.this), [self._resolve(r) for r in p.expressions])
 
+        # Astronomy specific syntax we extensively used in out projects.
+        # Function cone(ra, dec, radius)
+        elif isinstance(p, exp.Anonymous) and p.this.lower() == 'cone':
+            
+            return self._resolve_cone(p)
+
         else:
             raise exceptions.InvalidQuery()
 
@@ -140,3 +151,28 @@ class Parser:
             return F(full_field_name)
         except django_exceptions.FieldDoesNotExist:
             raise exceptions.FieldDoesNotExist(parts[0].this)
+
+    def _resolve_cone(self, p):
+
+        if len(p.expressions) != 3:
+            raise exceptions.InvalidConeNumberArguments
+
+        cone_params = dict(
+            cone_ra = self._resolve(p.expressions[0]).value,
+            cone_dec = self._resolve(p.expressions[1]).value,
+            cone_radius = self._resolve(p.expressions[2]).value,
+            )
+        # Check whether this is the first Cone statement or 
+        # there are already several in the query.
+        cone_index = len(self.extra_params['cones'])
+        cone_index_str = "" if cone_index == 0 else str(cone_index)
+
+        # Extend dictionary with Cone parameters
+        self.extra_params['cones'].append(cone_params)
+
+        # Build and return corresponding Django Q object with boolean
+        # statement cone_query=1 or cone_query1=1 etc
+        kwargs = dict()
+        kwargs[f"cone_query{cone_index_str}"] = True
+
+        return Q(**kwargs)

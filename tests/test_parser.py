@@ -1,7 +1,10 @@
 from django.test import TestCase
 from querylanguage import Parser, exceptions
 from .models import MainModel, RelatedModel, RelatedOfRelatedModel
-from django.db.models import Q, F
+from django.db.models import Q, F, Value
+from django.db.models.functions import Sqrt, Power
+from django.db.models.lookups import (Exact, IContains, GreaterThan, LessThan,
+    GreaterThanOrEqual, LessThanOrEqual, In, IsNull)
 import random
 
 
@@ -25,6 +28,8 @@ class BaseTest(TestCase):
                                         f1=random.randrange(-5, 5),
                                         f2=(random.random() - 0.5) * 50,
                                         f3=(random.random() - 0.5) * 10,
+                                        ra=random.uniform(0, 360),
+                                        dec=random.uniform(-90, 90),
                                         related=r)
         self.parser = Parser(MainModel)
 
@@ -127,7 +132,6 @@ class BasicTest(BaseTest):
     def test_basic_comparison_like_float(self):
         flt = self.parse("f2 ~ 1.")
         qs = MainModel.objects.filter(flt)
-        # import ipdb; ipdb.set_trace()
         ref = MainModel.objects.filter(f2__icontains=1.0)
         print("\nqs.count()--->", qs.count())
         print("ref.count()--->", ref.count())
@@ -465,6 +469,142 @@ class LogicalTest(BaseTest):
         self.assertEqual(qs.count(), ref.count())
         self.assertNotEqual(qs.count(), 0)
         self.assertQuerySetEqual(qs, ref, ordered=False)
+
+
+class ConeSearchTest(BaseTest):
+
+    def test_basic1(self):
+        self.assertEqual(self.parse('cone(120.3, 23, 1.0)'), Q(cone_query=True))
+
+        self.assertTrue(hasattr(self.parser, 'extra_params'))
+        self.assertEqual(len(self.parser.extra_params['cones']), 1)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_ra'], 120.3)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_dec'], 23.0)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_radius'], 1.0)
+
+        # reset Cone status parameters
+        self.parser.extra_params['cones'] = []
+
+    def test_basic2(self):
+        self.assertEqual(self.parse('cone(10, -13, 2)'), Q(cone_query=True))
+
+        self.assertTrue(hasattr(self.parser, 'extra_params'))
+        self.assertEqual(len(self.parser.extra_params['cones']), 1)
+
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_ra'], 10.0)
+
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_dec'], -13.0)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_radius'], 2.0)
+
+        self.parser.extra_params['cones'] = []
+
+    def test_basic3(self):
+        self.assertEqual(self.parse('cone(102, -56, 1.2)'), Q(cone_query=True))
+
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_ra'], 102.0)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_dec'], -56.0)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_radius'], 1.2)
+
+        self.parser.extra_params['cones'] = []
+
+    def test_cone_logical_and(self):
+        flt = self.parse("f1>1 and cone(102, -56, 50.2)")
+
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_ra'], 102.0)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_dec'], -56.0)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_radius'], 50.2)
+
+        # simplistic but wrong way to calculate distance 
+        ra = self.parser.extra_params['cones'][0]['cone_ra']
+        dec = self.parser.extra_params['cones'][0]['cone_dec']
+        radius = self.parser.extra_params['cones'][0]['cone_radius']
+        dist = Sqrt(Power(F('ra') - Value(ra), 2) + Power(F('dec') - Value(dec), 2))
+
+        querySet = MainModel.objects.annotate(cone_query=LessThanOrEqual(dist, Value(radius)))
+        qs = querySet.filter(flt)
+        ref = querySet.filter(Q(f1__gt=1) & Q(cone_query=True))
+    
+        print("\nqs.count()--->", qs.count())
+        print("ref.count()--->", ref.count())
+        self.assertEqual(qs.count(), ref.count())
+        self.assertNotEqual(qs.count(), 0)
+        self.assertQuerySetEqual(qs, ref, ordered=False)
+        
+        self.parser.extra_params['cones'] = []
+
+    def test_cone_logical_or_math_between(self):
+
+        flt = self.parse("cone(102, -56, 100.2) OR f1 - f2 between 1 and 5")
+
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_ra'], 102.0)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_dec'], -56.0)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_radius'], 100.2)
+
+        # simplistic but wrong way to calculate distance 
+        ra = self.parser.extra_params['cones'][0]['cone_ra']
+        dec = self.parser.extra_params['cones'][0]['cone_dec']
+        radius = self.parser.extra_params['cones'][0]['cone_radius']
+        dist = Sqrt(Power(F('ra') - Value(ra), 2) + Power(F('dec') - Value(dec), 2))
+
+        querySet = MainModel.objects.annotate(cone_query=LessThanOrEqual(dist, Value(radius)))
+        qs = querySet.filter(flt)
+        ref = querySet.annotate(diff=F('f1') - F('f2')).filter(Q(cone_query=True) | (Q(diff__gte=1) & Q(diff__lte=5)))
+    
+        print("\nqs.count()--->", qs.count())
+        print("ref.count()--->", ref.count())
+        self.assertEqual(qs.count(), ref.count())
+        self.assertNotEqual(qs.count(), 0)
+        self.assertQuerySetEqual(qs, ref, ordered=False)
+        
+        self.parser.extra_params['cones'] = []
+
+    def test_two_cones(self):
+        flt = self.parse("cone(120.3, 23, 60.12) or cone(10.3, -23, 50.5)")
+
+        self.assertTrue(hasattr(self.parser, 'extra_params'))
+        self.assertEqual(len(self.parser.extra_params['cones']), 2)
+
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_ra'], 120.3)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_dec'], 23.0)
+        self.assertEqual(self.parser.extra_params['cones'][0]['cone_radius'], 60.12)
+
+        self.assertEqual(self.parser.extra_params['cones'][1]['cone_ra'], 10.3)
+        self.assertEqual(self.parser.extra_params['cones'][1]['cone_dec'], -23.0)
+        self.assertEqual(self.parser.extra_params['cones'][1]['cone_radius'], 50.5)
+
+        # simplistic but wrong way to calculate distance 
+        ra1 = self.parser.extra_params['cones'][0]['cone_ra']
+        dec1 = self.parser.extra_params['cones'][0]['cone_dec']
+        radius1 = self.parser.extra_params['cones'][0]['cone_radius']
+        ra2 = self.parser.extra_params['cones'][1]['cone_ra']
+        dec2 = self.parser.extra_params['cones'][1]['cone_dec']
+        radius2 = self.parser.extra_params['cones'][1]['cone_radius']
+
+        dist1 = Sqrt(Power(F('ra') - Value(ra1), 2) + Power(F('dec') - Value(dec1), 2))
+        dist2 = Sqrt(Power(F('ra') - Value(ra2), 2) + Power(F('dec') - Value(dec2), 2))
+
+        querySet = MainModel.objects.annotate(cone_query=LessThanOrEqual(dist1, Value(radius1)),
+                                              cone_query1=LessThanOrEqual(dist2, Value(radius2)))
+        qs = querySet.filter(flt)
+        ref = querySet.filter(Q(cone_query=True) | Q(cone_query1=True))
+    
+        print("\nqs.count()--->", qs.count())
+        print("ref.count()--->", ref.count())
+        self.assertEqual(qs.count(), ref.count())
+        self.assertNotEqual(qs.count(), 0)
+        self.assertQuerySetEqual(qs, ref, ordered=False)
+        
+        self.parser.extra_params['cones'] = []
+
+    def test_wrong_cone_arguments(self):
+        with self.assertRaises(exceptions.InvalidConeNumberArguments):
+            self.parse('cone(120.3, 23, 1.0, 12.3)')
+
+    def test_case_sensitivity(self):
+        flt1 = self.parse('cone(120.3, 23, 1.0)')
+        self.parser.extra_params['cones'] = []
+        flt2 = self.parse('cOnE(120.3, 23, 1.0)')
+        self.assertEqual(flt1, flt2)
 
 
 class ValidationTest(BaseTest):
