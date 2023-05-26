@@ -7,13 +7,13 @@ from django.db.models.lookups import (Exact, IContains, GreaterThan, LessThan,
     GreaterThanOrEqual, LessThanOrEqual, In, IsNull)
 import random
 
+NROWS = 1000
 
 class BaseTest(TestCase):
     def setUp(self):
         # populate database
-        nrows = 1000
         random.seed(a=243)
-        for i in range(nrows):
+        for i in range(NROWS):
             s = ['bla', 'Bla', 'foo', 'bar', 'Bar', 'Rab', 'Abr', 'abc', 'cAb', 'foo bar']
             ro = RelatedOfRelatedModel.objects.create(rr_c1=random.choice(s),
                                                       rr_f1=random.randrange(-5, 5),
@@ -133,6 +133,16 @@ class BasicTest(BaseTest):
         flt = self.parse("f2 ~ 1.")
         qs = MainModel.objects.filter(flt)
         ref = MainModel.objects.filter(f2__icontains=1.0)
+        print("\nqs.count()--->", qs.count())
+        print("ref.count()--->", ref.count())
+        self.assertEqual(qs.count(), ref.count())
+        self.assertNotEqual(qs.count(), 0)
+        self.assertQuerySetEqual(qs, ref, ordered=False)
+
+    def test_basic_comparison_like_float2(self):
+        flt = self.parse("f2 ~ 1.1")
+        qs = MainModel.objects.filter(flt)
+        ref = MainModel.objects.filter(f2__icontains=1.1)
         print("\nqs.count()--->", qs.count())
         print("ref.count()--->", ref.count())
         self.assertEqual(qs.count(), ref.count())
@@ -261,6 +271,25 @@ class BasicTest(BaseTest):
         self.assertNotEqual(qs.count(), 0)
         self.assertQuerySetEqual(qs, ref, ordered=False)
 
+    def test_eq_null(self):
+        flt = self.parse('f1 = null')
+        qs = MainModel.objects.filter(flt)
+        ref = MainModel.objects.filter(f1__isnull=True)
+        print("\nqs.count()--->", qs.count())
+        print("ref.count()--->", ref.count())
+        self.assertEqual(qs.count(), ref.count())
+        self.assertEqual(qs.count(), 0)
+        self.assertQuerySetEqual(qs, ref, ordered=False)
+
+    def test_neq_null(self):
+        flt = self.parse('f1 != null')
+        qs = MainModel.objects.filter(flt)
+        ref = MainModel.objects.filter(f1__isnull=False)
+        print("\nqs.count()--->", qs.count())
+        print("ref.count()--->", ref.count())
+        self.assertEqual(qs.count(), ref.count())
+        self.assertEqual(qs.count(), NROWS)
+        self.assertQuerySetEqual(qs, ref, ordered=False)
 
 class RelatedModelTest(BaseTest):
 

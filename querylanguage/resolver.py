@@ -73,7 +73,10 @@ class Parser:
 
         # Comparison operators
         elif isinstance(p, exp.EQ):
-            return Exact(self._resolve(p.left), self._resolve(p.right))
+            if isinstance(p.right, exp.Null):
+                return IsNull(self._resolve(p.left), True)
+            else:
+                return Exact(self._resolve(p.left), self._resolve(p.right))
 
         elif isinstance(p, exp.Is):
             if isinstance(p.right, exp.Null):
@@ -82,7 +85,10 @@ class Parser:
                 return Exact(self._resolve(p.left), self._resolve(p.right))
 
         elif isinstance(p, exp.NEQ):
-            return ~Exact(self._resolve(p.left), self._resolve(p.right))
+            if isinstance(p.right, exp.Null):
+                return IsNull(self._resolve(p.left), False)
+            else:
+                return ~Exact(self._resolve(p.left), self._resolve(p.right))
 
         elif isinstance(p, exp.GT):
             return GreaterThan(self._resolve(p.left), self._resolve(p.right))
