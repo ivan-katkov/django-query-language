@@ -23,6 +23,7 @@ class MainModel(models.Model):
     f3 = models.FloatField(null=True)
     ra = models.FloatField(null=True)
     dec = models.FloatField(null=True)
+    js = models.JSONField(null=True)
 
     related = models.ForeignKey(RelatedModel, on_delete=models.CASCADE)
 

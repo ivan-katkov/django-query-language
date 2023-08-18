@@ -5,7 +5,7 @@ from . import exceptions
 from django.db.models import Value, Q, F
 from django.db.models.lookups import (Exact, IContains, GreaterThan, LessThan,
     GreaterThanOrEqual, LessThanOrEqual, In, IsNull)
-
+from django.db.models.fields import json
 
 class Parser:
 
@@ -142,21 +142,61 @@ class Parser:
         """
         model = self.model
 
-        parts = p.parts
+        identifiers = [prt.this for prt in p.parts]
 
-        while len(parts) > 1:
-            # iterate over all nested levels
-            current_identifier = parts.pop(0)
-            model = model._meta.get_field(current_identifier.this).related_model
+        def check_related_fields(model, identifiers):
+            model_fields = [f.name for f in model._meta.fields]
+            model_fields_related = [f.name for f in model._meta.fields if f.is_relation]
+            
+            # call custom exception to test which exactly field cause an error in the test suite
+            try:
+                field = model._meta.get_field(identifiers[0])
+            except django_exceptions.FieldDoesNotExist:
+                raise exceptions.FieldDoesNotExist(identifiers[0])
+            
+            if len(identifiers) == 1:
+                if not identifiers[0] in model_fields:
+                    raise exceptions.FieldDoesNotExist(identifiers[0])
+            else:
+                # nested column notation can be Related or JSONField only. Otherwise, raise an error
+                if field.is_relation:
+                    check_related_fields(field.related_model, identifiers[1:])
+                elif not isinstance(field, json.JSONField):
+                    msg = f"{field.name} is not Relation field or JSON field"
+                    raise exceptions.FieldDoesNotExist(field, message=msg)
+                    
+                
+        check_related_fields(model, identifiers)    
+        full_field_name = "__".join([part.this for part in p.parts])
+        # print("----> full_field_name: ", full_field_name)
+        
+        return F(full_field_name)
 
-        try:
-            # check field name existence
-            model._meta.get_field(parts[0].this)
+        # while len(parts) > 1:
+        #     # iterate over all nested levels
+        #     current_identifier = parts.pop(0)
+        #     field = model._meta.get_field(current_identifier)
 
-            full_field_name = "__".join([part.this for part in p.parts])
-            return F(full_field_name)
-        except django_exceptions.FieldDoesNotExist:
-            raise exceptions.FieldDoesNotExist(parts[0].this)
+        #     # print("debug1:", field)
+        #     if isinstance(field, json.JSONField):
+        #         # print("debug2:", field)
+        #         break
+        #     # print("debug3:", field)
+        #     model = field.related_model
+
+        # try:
+        #     # check field name existence
+        #     # model._meta.get_field(current_identifier)
+            
+
+        #     full_field_name = "__".join([part.this for part in p.parts])
+        #     print("----> full_field_name: ", full_field_name)
+            
+        #     check_related_fields(model, identifiers)
+            
+        #     return F(full_field_name)
+        # except django_exceptions.FieldDoesNotExist:
+        #     raise exceptions.FieldDoesNotExist(full_field_name)
 
     def _resolve_cone(self, p):
 

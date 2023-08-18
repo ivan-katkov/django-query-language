@@ -6,6 +6,7 @@ from django.db.models.functions import Sqrt, Power
 from django.db.models.lookups import (Exact, IContains, GreaterThan, LessThan,
     GreaterThanOrEqual, LessThanOrEqual, In, IsNull)
 import random
+from django.core import exceptions as django_exceptions
 
 NROWS = 1000
 
@@ -30,6 +31,12 @@ class BaseTest(TestCase):
                                         f3=(random.random() - 0.5) * 10,
                                         ra=random.uniform(0, 360),
                                         dec=random.uniform(-90, 90),
+                                        js={"f_str": random.choice(s),
+                                            "f_num": random.randrange(-5, 5),
+                                            "f_nest": {
+                                                "f_str": random.choice(s),
+                                                "f_num": random.randrange(-5, 5),
+                                            }},
                                         related=r)
         self.parser = Parser(MainModel)
 
@@ -646,3 +653,35 @@ class ValidationTest(BaseTest):
             self.assertEqual(e.field, 'unknown')
         else:
             self.fail("Unknown field shouldn't be accepted")
+
+class JSONFieldTest(BaseTest):
+
+    def test_json_field_equal(self):
+        flt = self.parse("js.f_str = 'foo'")
+        qs = MainModel.objects.filter(flt)
+        ref = MainModel.objects.filter(js__f_str="foo")
+        print("\nqs.count()--->", qs.count())
+        print("ref.count()--->", ref.count())
+        self.assertEqual(qs.count(), ref.count())
+        self.assertNotEqual(qs.count(), 0)
+        self.assertQuerySetEqual(qs, ref, ordered=False)
+
+    def test_json_field_icontains(self):
+        flt = self.parse("js.f_str ~ 'oo'")
+        qs = MainModel.objects.filter(flt)
+        ref = MainModel.objects.filter(js__f_str__icontains="oo")
+        print("\nqs.count()--->", qs.count())
+        print("ref.count()--->", ref.count())
+        self.assertEqual(qs.count(), ref.count())
+        self.assertNotEqual(qs.count(), 0)
+        self.assertQuerySetEqual(qs, ref, ordered=False)
+
+    def test_json_field_gt(self):
+        flt = self.parse("js.f_num > 2.0")
+        qs = MainModel.objects.filter(flt)
+        ref = MainModel.objects.filter(js__f_num__gt=2.0)
+        print("\nqs.count()--->", qs.count())
+        print("ref.count()--->", ref.count())
+        self.assertEqual(qs.count(), ref.count())
+        self.assertNotEqual(qs.count(), 0)
+        self.assertQuerySetEqual(qs, ref, ordered=False)

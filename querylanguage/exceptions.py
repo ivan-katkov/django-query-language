@@ -1,7 +1,9 @@
 class FieldDoesNotExist(Exception):
-    def __init__(self, field):
+    def __init__(self, field, message=None):
         self.field = field
-        super().__init__("Field '%s' does not exist" % field)
+        if message is None:
+            super().__init__("Field '%s' does not exist" % field)
+        super().__init__(message)
 
 class InvalidQuery(Exception):
     def __init__(self):
